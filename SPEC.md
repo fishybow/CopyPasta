@@ -30,14 +30,21 @@ CopyPasta is an iOS app that records text from the system pasteboard while the a
 - All entries are shown in a **single-column `List`**, newest at the top.
 - **Paged lazy loading:** the list loads an initial page from SwiftData; when the user scrolls near the end of the currently loaded rows, the next page is fetched (fetch limit + offset). Loading is sequential (no speculative multi-page jumps required).
 
-## Row actions
-
-Per row, the user can:
-
-- **Delete** — removes the row from SwiftData and from the UI.
-- **Copy** — writes that row’s `text` to the general pasteboard.
+## Row actions and feedback
 
 There is **no reorder** and **no update** of existing rows.
+
+### Copy
+
+- **Primary interaction:** a **single tap** on the row copies that row’s `text` to the general pasteboard.
+- **Feedback on copy:**
+  - **Haptic:** a success-style notification haptic (`UINotificationFeedbackGenerator`).
+  - **Visual:** brief row highlight (accent-tinted background) plus a green checkmark on the row; the highlight clears after a short delay (~0.55s).
+- **Alternate copy:** leading **swipe** “Copy” and **context menu → Copy** perform the same copy action and the same haptic + visual feedback.
+
+### Delete
+
+- **Trailing swipe** (full swipe allowed) or **context menu → Delete** removes the row from SwiftData and from the UI.
 
 ## Non-goals (this version)
 
