@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var store = ClipboardHistoryStore()
     @State private var flashCopiedID: PersistentIdentifier?
     @State private var showPasteboardHelp = false
+    @State private var showClearAllConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -32,10 +33,19 @@ struct ContentView: View {
             .navigationTitle("CopyPasta")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showPasteboardHelp = true
+                    Menu {
+                        Button {
+                            showPasteboardHelp = true
+                        } label: {
+                            Label("Clipboard access help", systemImage: "questionmark.circle")
+                        }
+                        Button(role: .destructive) {
+                            showClearAllConfirmation = true
+                        } label: {
+                            Label("Clear all entries", systemImage: "trash")
+                        }
                     } label: {
-                        Label("Clipboard access help", systemImage: "questionmark.circle")
+                        Label("Menu", systemImage: "ellipsis.circle")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -48,6 +58,18 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showPasteboardHelp) {
                 PasteboardAccessHelpSheet()
+            }
+            .confirmationDialog(
+                "Clear all entries?",
+                isPresented: $showClearAllConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Clear all", role: .destructive) {
+                    store.clearAllEntries()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes every saved clip from this device. It cannot be undone.")
             }
             .onAppear {
                 store.attach(modelContext: modelContext)

@@ -76,6 +76,17 @@ final class ClipboardHistoryStore {
         try? modelContext.save()
     }
 
+    func clearAllEntries() {
+        guard let modelContext else { return }
+        let descriptor = FetchDescriptor<ClipboardEntry>()
+        guard let all = try? modelContext.fetch(descriptor) else { return }
+        for entry in all {
+            modelContext.delete(entry)
+        }
+        try? modelContext.save()
+        loadInitial()
+    }
+
     func copyToPasteboard(_ entry: ClipboardEntry) {
         UIPasteboard.general.string = entry.text
         lastPasteboardText = entry.text
