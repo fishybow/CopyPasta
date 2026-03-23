@@ -27,13 +27,22 @@ struct ContentView: View {
                         }
                 }
             }
+            .listStyle(.plain)
+            .contentMargins(.horizontal, 0, for: .scrollContent)
             .navigationTitle("CopyPasta")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
                         showPasteboardHelp = true
                     } label: {
                         Label("Clipboard access help", systemImage: "questionmark.circle")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        store.capturePasteboardIfChanged()
+                    } label: {
+                        Label("Read clipboard now", systemImage: "arrow.down.doc")
                     }
                 }
             }
@@ -103,6 +112,8 @@ struct ContentView: View {
             copyWithFeedback(entry)
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
         .listRowBackground(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.accentColor.opacity(flashCopiedID == entry.persistentModelID ? 0.14 : 0))
