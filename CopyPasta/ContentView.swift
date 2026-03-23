@@ -2,60 +2,90 @@
 //  ContentView.swift
 //  CopyPasta
 //
-//  Created by Sean on 3/23/26.
-//
 
-import SwiftUI
 import SwiftData
+import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Environment(\.scenePhase) private var scenePhase
+
+    @State private var store = ClipboardHistoryStore()
 
     var body: some View {
-        NavigationSplitView {
+        NavigationStack {
             List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+                ForEach(store.entries) { entry in
+                    row(for: entry)
+                        .onAppear {
+                            if entry.persistentModelID == store.entries.last?.persistentModelID {
+                                store.loadNextPage()
+                            }
+                        }
                 }
             }
-        } detail: {
-            Text("Select an item")
+            .navigationTitle("CopyPasta")
+            .onAppear {
+                store.attach(modelContext: modelContext)
+                if store.entries.isEmpty {
+                    store.loadInitial()
+                }
+                store.capturePasteboardIfChanged()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    store.capturePasteboardIfChanged()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
+                store.capturePasteboardIfChanged()
+            }
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+    @ViewBuilder
+    private func row(for entry: ClipboardEntry) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(entry.text)
+                .font(.body)
+                .lineLimit(4)
+            Text(entry.capturedAt, format: .dateTime)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+        .padding(.vertical, 4)
+        .contextMenu {
+            Button {
+                store.copyToPasteboard(entry)
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
             }
+            Button(role: .destructive) {
+                store.delete(entry)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                store.delete(entry)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .swipeActions(edge: .leading) {
+            Button {
+                store.copyToPasteboard(entry)
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+            .tint(.blue)
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: ClipboardEntry.self, inMemory: true)
 }
