@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var flashCopiedID: PersistentIdentifier?
     @State private var showPasteboardHelp = false
     @State private var showClearAllConfirmation = false
+    @State private var fullContentDetail: FullContentDetail?
 
     var body: some View {
         NavigationStack {
@@ -37,12 +38,12 @@ struct ContentView: View {
                         Button {
                             showPasteboardHelp = true
                         } label: {
-                            Label("Clipboard access help", systemImage: "questionmark.circle")
+                            Label("Clipboard Access Help", systemImage: "questionmark.circle")
                         }
                         Button(role: .destructive) {
                             showClearAllConfirmation = true
                         } label: {
-                            Label("Clear all entries", systemImage: "trash")
+                            Label("Clear All Entries", systemImage: "trash")
                         }
                     } label: {
                         Label("Menu", systemImage: "ellipsis.circle")
@@ -52,19 +53,22 @@ struct ContentView: View {
                     Button {
                         store.capturePasteboardIfChanged()
                     } label: {
-                        Label("Read clipboard now", systemImage: "arrow.down.doc")
+                        Label("Read Clipboard Now", systemImage: "arrow.down.doc")
                     }
                 }
             }
             .sheet(isPresented: $showPasteboardHelp) {
                 PasteboardAccessHelpSheet()
             }
+            .sheet(item: $fullContentDetail) { detail in
+                FullContentSheet(detail: detail)
+            }
             .confirmationDialog(
-                "Clear all entries?",
+                "Clear All Entries?",
                 isPresented: $showClearAllConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Clear all", role: .destructive) {
+                Button("Clear All", role: .destructive) {
                     store.clearAllEntries()
                 }
                 Button("Cancel", role: .cancel) {}
@@ -142,6 +146,11 @@ struct ContentView: View {
         )
         .contextMenu {
             Button {
+                fullContentDetail = FullContentDetail(from: entry)
+            } label: {
+                Label("View Full Content", systemImage: "doc.text")
+            }
+            Button {
                 copyWithFeedback(entry)
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
@@ -170,6 +179,51 @@ struct ContentView: View {
     }
 }
 
+private struct FullContentDetail: Identifiable {
+    let id = UUID()
+    let text: String
+    let capturedAt: Date
+
+    init(from entry: ClipboardEntry) {
+        text = entry.text
+        capturedAt = entry.capturedAt
+    }
+}
+
+private struct FullContentSheet: View {
+    let detail: FullContentDetail
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(detail.text)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .padding()
+            }
+            .navigationTitle("Full Content")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Text(detail.capturedAt, format: .dateTime)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(.bar)
+            }
+        }
+    }
+}
+
 private struct PasteboardAccessHelpSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -177,7 +231,7 @@ private struct PasteboardAccessHelpSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Allow clipboard access")
+                    Text("Allow Clipboard Access")
                         .font(.title2.weight(.semibold))
 
                     Text(
