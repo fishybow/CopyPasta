@@ -16,81 +16,106 @@ struct ContentView: View {
     @State private var showPasteboardHelp = false
     @State private var showClearAllConfirmation = false
     @State private var fullContentDetail: FullContentDetail?
+    @State private var starredTabPrimed = false
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(store.entries) { entry in
-                    row(for: entry)
-                        .onAppear {
-                            if entry.persistentModelID == store.entries.last?.persistentModelID {
-                                store.loadNextPage()
-                            }
-                        }
-                }
+        TabView {
+            NavigationStack {
+                entriesList(
+                    entries: store.entries,
+                    loadNextPage: { store.loadNextPage() }
+                )
+                .navigationTitle("CopyPasta")
+                .copyPastaNavigationToolbar(
+                    showPasteboardHelp: $showPasteboardHelp,
+                    showClearAllConfirmation: $showClearAllConfirmation,
+                    onReadClipboard: { store.capturePasteboardIfChanged() }
+                )
             }
-            .listStyle(.plain)
-            .contentMargins(.horizontal, 0, for: .scrollContent)
-            .navigationTitle("CopyPasta")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        Button {
-                            showPasteboardHelp = true
-                        } label: {
-                            Label("Clipboard Access Help", systemImage: "questionmark.circle")
-                        }
-                        Button(role: .destructive) {
-                            showClearAllConfirmation = true
-                        } label: {
-                            Label("Clear All Entries", systemImage: "trash")
-                        }
-                    } label: {
-                        Label("Menu", systemImage: "ellipsis.circle")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        store.capturePasteboardIfChanged()
-                    } label: {
-                        Label("Read Clipboard Now", systemImage: "arrow.down.doc")
+            .tabItem {
+                Label("All", systemImage: "list.bullet")
+            }
+
+            NavigationStack {
+                entriesList(
+                    entries: store.starredEntries,
+                    loadNextPage: { store.loadNextStarredPage() }
+                )
+                .navigationTitle("Starred")
+                .copyPastaNavigationToolbar(
+                    showPasteboardHelp: $showPasteboardHelp,
+                    showClearAllConfirmation: $showClearAllConfirmation,
+                    onReadClipboard: { store.capturePasteboardIfChanged() }
+                )
+                .onAppear {
+                    if !starredTabPrimed {
+                        starredTabPrimed = true
+                        store.loadInitialStarred()
                     }
                 }
             }
-            .sheet(isPresented: $showPasteboardHelp) {
-                PasteboardAccessHelpSheet()
+            .tabItem {
+                Label("Starred", systemImage: "star.fill")
             }
-            .sheet(item: $fullContentDetail) { detail in
-                FullContentSheet(detail: detail)
+        }
+        .sheet(isPresented: $showPasteboardHelp) {
+            PasteboardAccessHelpSheet()
+        }
+        .sheet(item: $fullContentDetail) { detail in
+            FullContentSheet(detail: detail)
+        }
+        .confirmationDialog(
+            "Clear All Entries?",
+            isPresented: $showClearAllConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear All", role: .destructive) {
+                store.clearAllEntries()
             }
-            .confirmationDialog(
-                "Clear All Entries?",
-                isPresented: $showClearAllConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Clear All", role: .destructive) {
-                    store.clearAllEntries()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This removes every saved clip from this device. It cannot be undone.")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes every saved clip from this device. It cannot be undone.")
+        }
+        .onAppear {
+            store.attach(modelContext: modelContext)
+            if store.entries.isEmpty {
+                store.loadInitial()
             }
-            .onAppear {
-                store.attach(modelContext: modelContext)
-                if store.entries.isEmpty {
-                    store.loadInitial()
-                }
-                store.capturePasteboardIfChanged()
-            }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active {
-                    store.capturePasteboardIfChanged()
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
+            store.capturePasteboardIfChanged()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
                 store.capturePasteboardIfChanged()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
+            store.capturePasteboardIfChanged()
+        }
+    }
+
+    @ViewBuilder
+    private func entriesList(
+        entries: [ClipboardEntry],
+        loadNextPage: @escaping () -> Void
+    ) -> some View {
+        List {
+            ForEach(entries) { entry in
+                ClipboardEntryRow(
+                    entry: entry,
+                    store: store,
+                    isCopiedFlash: flashCopiedID == entry.persistentModelID,
+                    onCopy: { copyWithFeedback(entry) },
+                    onViewFullContent: { fullContentDetail = FullContentDetail(from: entry) }
+                )
+                .onAppear {
+                    if entry.persistentModelID == entries.last?.persistentModelID {
+                        loadNextPage()
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .contentMargins(.horizontal, 0, for: .scrollContent)
     }
 
     private func copyWithFeedback(_ entry: ClipboardEntry) {
@@ -112,69 +137,38 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private func row(for entry: ClipboardEntry) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(entry.text)
-                    .font(.body)
-                    .lineLimit(4)
-                Text(entry.capturedAt, format: .dateTime)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+}
 
-            if flashCopiedID == entry.persistentModelID {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.green)
-                    .symbolEffect(.bounce, value: flashCopiedID == entry.persistentModelID)
-                    .transition(.scale.combined(with: .opacity))
+private extension View {
+    func copyPastaNavigationToolbar(
+        showPasteboardHelp: Binding<Bool>,
+        showClearAllConfirmation: Binding<Bool>,
+        onReadClipboard: @escaping () -> Void
+    ) -> some View {
+        toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Button {
+                        showPasteboardHelp.wrappedValue = true
+                    } label: {
+                        Label("Clipboard Access Help", systemImage: "questionmark.circle")
+                    }
+                    Button(role: .destructive) {
+                        showClearAllConfirmation.wrappedValue = true
+                    } label: {
+                        Label("Clear All Entries", systemImage: "trash")
+                    }
+                } label: {
+                    Label("Menu", systemImage: "ellipsis.circle")
+                }
             }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            copyWithFeedback(entry)
-        }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 16)
-        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-        .listRowBackground(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.accentColor.opacity(flashCopiedID == entry.persistentModelID ? 0.14 : 0))
-        )
-        .contextMenu {
-            Button {
-                fullContentDetail = FullContentDetail(from: entry)
-            } label: {
-                Label("View Full Content", systemImage: "doc.text")
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    onReadClipboard()
+                } label: {
+                    Label("Read Clipboard Now", systemImage: "arrow.down.doc")
+                }
             }
-            Button {
-                copyWithFeedback(entry)
-            } label: {
-                Label("Copy", systemImage: "doc.on.doc")
-            }
-            Button(role: .destructive) {
-                store.delete(entry)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                store.delete(entry)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .swipeActions(edge: .leading) {
-            Button {
-                copyWithFeedback(entry)
-            } label: {
-                Label("Copy", systemImage: "doc.on.doc")
-            }
-            .tint(.blue)
         }
     }
 }

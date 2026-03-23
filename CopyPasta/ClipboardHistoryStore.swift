@@ -14,11 +14,15 @@ final class ClipboardHistoryStore {
 
     private(set) var entries: [ClipboardEntry] = []
     private(set) var hasMore = true
+    private(set) var starredEntries: [ClipboardEntry] = []
+    private(set) var hasMoreStarred = true
 
     private var modelContext: ModelContext?
     private var fetchOffset = 0
+    private var fetchStarredOffset = 0
     private let pageSize = 40
     private var isLoadingPage = false
+    private var isLoadingStarredPage = false
     private var lastPasteboardText: String?
 
     func attach(modelContext: ModelContext) {
@@ -52,6 +56,40 @@ final class ClipboardHistoryStore {
         hasMore = batch.count == pageSize
     }
 
+    func loadInitialStarred() {
+        starredEntries.removeAll()
+        fetchStarredOffset = 0
+        hasMoreStarred = true
+        loadNextStarredPage()
+    }
+
+    func loadNextStarredPage() {
+        guard let modelContext, !isLoadingStarredPage, hasMoreStarred else { return }
+        isLoadingStarredPage = true
+        defer { isLoadingStarredPage = false }
+
+        let starred = #Predicate<ClipboardEntry> { $0.isStarred == true }
+        var descriptor = FetchDescriptor<ClipboardEntry>(
+            predicate: starred,
+            sortBy: [SortDescriptor(\.capturedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = pageSize
+        descriptor.fetchOffset = fetchStarredOffset
+
+        guard let batch = try? modelContext.fetch(descriptor) else { return }
+        starredEntries.append(contentsOf: batch)
+        fetchStarredOffset += batch.count
+        hasMoreStarred = batch.count == pageSize
+    }
+
+    func setStarred(_ entry: ClipboardEntry, starred: Bool) {
+        guard let modelContext else { return }
+        guard entry.isStarred != starred else { return }
+        entry.isStarred = starred
+        try? modelContext.save()
+        loadInitialStarred()
+    }
+
     /// Persists pasteboard text when it changes; then reloads the first page so newest items stay correct.
     func capturePasteboardIfChanged() {
         guard let modelContext else { return }
@@ -73,6 +111,7 @@ final class ClipboardHistoryStore {
         guard let modelContext else { return }
         modelContext.delete(entry)
         entries.removeAll { $0.persistentModelID == entry.persistentModelID }
+        starredEntries.removeAll { $0.persistentModelID == entry.persistentModelID }
         try? modelContext.save()
     }
 
@@ -85,6 +124,7 @@ final class ClipboardHistoryStore {
         }
         try? modelContext.save()
         loadInitial()
+        loadInitialStarred()
     }
 
     func copyToPasteboard(_ entry: ClipboardEntry) {
