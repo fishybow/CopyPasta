@@ -133,3 +133,57 @@ final class ClipboardHistoryStore {
         UserDefaults.standard.set(entry.text, forKey: Self.pasteboardFingerprintKey)
     }
 }
+
+#if DEBUG
+extension ClipboardHistoryStore {
+    /// Inserts five realistic clips with staggered timestamps (newest first after reload). Debug builds only.
+    func seedDebugSampleEntries() {
+        guard let modelContext else { return }
+
+        let base = Date.now
+        let samples: [(text: String, secondsAgo: TimeInterval, starred: Bool)] = [
+            (
+                """
+                Marina — looping you in on the vendor MSA redlines. Latest PDF is in Drive under Legal/Vendors/MSA-draft-v4.pdf. Legal wants sign-off by Friday COB if we want Feb 1 effective date.
+                """,
+                0,
+                true
+            ),
+            (
+                "https://maps.apple.com/?address=1+Infinite+Loop,+Cupertino,+CA+95014",
+                12 * 60,
+                false
+            ),
+            (
+                """
+                func reconcile(_ items: [Item]) async throws -> Summary {
+                    try await coordinator.flushPending()
+                    return Summary(count: items.count, updatedAt: .now)
+                }
+                """,
+                47 * 60,
+                true
+            ),
+            (
+                "Order #8F29-LL · 2× USB-C braided 2m, 1× 140W GaN adapter · Ship to: 428 Oak St, Apt 3B, Oakland CA · Est. Thu by 8pm",
+                3 * 3_600,
+                false
+            ),
+            (
+                "All-hands moved to 10:30am PT tomorrow — same Zoom as last week (check the updated calendar invite). Q4 roadmap slides due EOD today if you’re presenting.",
+                26 * 3_600,
+                false
+            ),
+        ]
+
+        for sample in samples {
+            let capturedAt = base.addingTimeInterval(-sample.secondsAgo)
+            let entry = ClipboardEntry(text: sample.text.trimmingCharacters(in: .whitespacesAndNewlines), capturedAt: capturedAt, isStarred: sample.starred)
+            modelContext.insert(entry)
+        }
+        try? modelContext.save()
+        loadInitial()
+        loadInitialStarred()
+    }
+}
+#endif

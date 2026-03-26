@@ -28,7 +28,8 @@ struct AllEntriesTabView: View {
             .copyPastaNavigationToolbar(
                 showPasteboardHelp: $showPasteboardHelp,
                 showClearAllConfirmation: $showClearAllConfirmation,
-                onReadClipboard: { store.capturePasteboardIfChanged() }
+                onReadClipboard: { store.capturePasteboardIfChanged() },
+                onSeedDebugEntries: CopyPastaDebugMenu.seedSampleEntriesAction(store: store)
             )
         }
     }
