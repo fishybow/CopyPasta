@@ -3,9 +3,25 @@
 //  CopyPasta
 //
 
+import Foundation
 import SwiftData
 import SwiftUI
 import UIKit
+
+// MARK: - JSON backup (export / import)
+
+private struct ClipboardHistoryExportPayload: Codable {
+    let exportVersion: Int
+    /// Present in files this app writes; optional when decoding hand-edited JSON.
+    let exportedAt: Date?
+    let entries: [ClipboardHistoryExportEntry]
+}
+
+private struct ClipboardHistoryExportEntry: Codable {
+    let text: String
+    let capturedAt: Date
+    let isStarred: Bool
+}
 
 @Observable
 @MainActor
@@ -131,6 +147,86 @@ final class ClipboardHistoryStore {
         UIPasteboard.general.string = entry.text
         lastPasteboardText = entry.text
         UserDefaults.standard.set(entry.text, forKey: Self.pasteboardFingerprintKey)
+    }
+
+    /// All saved clips, newest first, encoded as JSON for backup or transfer.
+    func exportAllEntriesJSON() throws -> Data {
+        guard let modelContext else {
+            throw ClipboardExportError.storeNotReady
+        }
+        let descriptor = FetchDescriptor<ClipboardEntry>(
+            sortBy: [SortDescriptor(\.capturedAt, order: .reverse)]
+        )
+        let all = try modelContext.fetch(descriptor)
+        let payload = ClipboardHistoryExportPayload(
+            exportVersion: 1,
+            exportedAt: Date(),
+            entries: all.map {
+                ClipboardHistoryExportEntry(text: $0.text, capturedAt: $0.capturedAt, isStarred: $0.isStarred)
+            }
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(payload)
+    }
+
+    /// Inserts clips from JSON produced by this app (`exportVersion` 1). Skips entries whose text is empty after trimming. Returns how many rows were added.
+    func importEntriesFromJSON(_ data: Data) throws -> Int {
+        guard let modelContext else {
+            throw ClipboardImportError.storeNotReady
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let payload: ClipboardHistoryExportPayload
+        do {
+            payload = try decoder.decode(ClipboardHistoryExportPayload.self, from: data)
+        } catch {
+            throw ClipboardImportError.invalidJSON(error)
+        }
+        guard payload.exportVersion == 1 else {
+            throw ClipboardImportError.unsupportedVersion(payload.exportVersion)
+        }
+        var inserted = 0
+        for item in payload.entries {
+            let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { continue }
+            let entry = ClipboardEntry(text: text, capturedAt: item.capturedAt, isStarred: item.isStarred)
+            modelContext.insert(entry)
+            inserted += 1
+        }
+        try modelContext.save()
+        loadInitial()
+        loadInitialStarred()
+        return inserted
+    }
+}
+
+enum ClipboardExportError: LocalizedError {
+    case storeNotReady
+
+    var errorDescription: String? {
+        switch self {
+        case .storeNotReady:
+            "Clipboard history is not available yet. Try again in a moment."
+        }
+    }
+}
+
+enum ClipboardImportError: LocalizedError {
+    case storeNotReady
+    case invalidJSON(Error)
+    case unsupportedVersion(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .storeNotReady:
+            "Clipboard history is not available yet. Try again in a moment."
+        case .invalidJSON:
+            "The file is not valid CopyPasta backup JSON."
+        case .unsupportedVersion(let v):
+            "This backup uses export version \(v), which this version of the app does not support."
+        }
     }
 }
 
