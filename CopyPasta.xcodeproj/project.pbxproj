@@ -251,7 +251,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "exec \"${SRCROOT}/Scripts/embed-git-revision.sh\"\n";
+			shellScript = "/bin/sh \"${SRCROOT}/Scripts/embed-git-revision.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
