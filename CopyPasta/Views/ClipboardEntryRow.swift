@@ -91,11 +91,15 @@ struct ClipboardEntryRow: View {
         }
         .swipeActions(edge: .leading) {
             Button {
-                onCopy()
+                store.setStarred(entry, starred: !entry.isStarred)
             } label: {
-                Label("Copy", systemImage: "doc.on.doc")
+                if entry.isStarred {
+                    Label("Remove Star", systemImage: "star.slash")
+                } else {
+                    Label("Star", systemImage: "star.fill")
+                }
             }
-            .tint(.blue)
+            .tint(.yellow)
         }
     }
 }
