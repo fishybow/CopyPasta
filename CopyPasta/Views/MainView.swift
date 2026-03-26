@@ -44,6 +44,11 @@ struct MainView: View {
             .tabItem {
                 Label("Starred", systemImage: "star.fill")
             }
+
+            PrivacyTabView()
+                .tabItem {
+                    Label("Privacy", systemImage: "hand.raised.fill")
+                }
         }
         .sheet(isPresented: $showPasteboardHelp) {
             PasteboardAccessHelpSheet()
