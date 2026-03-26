@@ -50,7 +50,7 @@ extension View {
                 Button {
                     onReadClipboard()
                 } label: {
-                    Label("Read Clipboard Now", systemImage: "arrow.down.doc")
+                    Label("Read Clipboard Now", systemImage: "plus.circle")
                 }
             }
         }
