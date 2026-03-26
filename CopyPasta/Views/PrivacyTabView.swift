@@ -21,6 +21,13 @@ struct PrivacyTabView: View {
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "—"
     }
 
+    private var gitCommitURL: URL? {
+        guard GitRevision.fullHash != "unknown" else { return nil }
+        return CopyPastaMetadata.repositoryURL
+            .appendingPathComponent("commit")
+            .appendingPathComponent(GitRevision.fullHash)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -57,6 +64,17 @@ struct PrivacyTabView: View {
                 Section {
                     LabeledContent("Version", value: appVersion)
                     LabeledContent("Build", value: appBuild)
+                    if let url = gitCommitURL {
+                        Link(destination: url) {
+                            LabeledContent("Git commit", value: GitRevision.shortHash)
+                        }
+                    } else {
+                        LabeledContent("Git commit", value: GitRevision.shortHash)
+                    }
+                } footer: {
+                    Text(
+                        "Git commit is the repository revision used for this build. Tap to open it on GitHub when available."
+                    )
                 }
             }
             .navigationTitle("Privacy")
