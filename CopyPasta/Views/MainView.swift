@@ -45,7 +45,7 @@ struct MainView: View {
                 Label("Starred", systemImage: "star.fill")
             }
 
-            PrivacyTabView()
+            PrivacyTabView(showPasteboardHelp: $showPasteboardHelp)
                 .tabItem {
                     Label("Privacy", systemImage: "hand.raised.fill")
                 }

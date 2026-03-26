@@ -11,6 +11,8 @@ private enum CopyPastaMetadata {
 }
 
 struct PrivacyTabView: View {
+    @Binding var showPasteboardHelp: Bool
+
     private var appVersion: String {
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "—"
     }
@@ -28,6 +30,18 @@ struct PrivacyTabView: View {
                     )
                     .font(.body)
                     .foregroundStyle(.primary)
+                }
+
+                Section {
+                    Button {
+                        showPasteboardHelp = true
+                    } label: {
+                        Label("Clipboard Access Help", systemImage: "questionmark.circle")
+                    }
+                } footer: {
+                    Text(
+                        "If iOS asks before reading the clipboard, use this guide to allow paste access so clips can be captured automatically while the app is open."
+                    )
                 }
 
                 Section {
@@ -51,5 +65,5 @@ struct PrivacyTabView: View {
 }
 
 #Preview {
-    PrivacyTabView()
+    PrivacyTabView(showPasteboardHelp: .constant(false))
 }
