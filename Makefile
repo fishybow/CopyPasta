@@ -1,5 +1,5 @@
 first:
 	git status
 
-deploy:
-	git push develop:main && git push --all
+release:
+	git push . develop:main && git push --all
